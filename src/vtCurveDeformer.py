@@ -8,7 +8,7 @@ import numpy as np
 from math import sqrt
 from random import randint
 
-sys.path.insert(0, '/Users/fruity/Documents/_dev/fToolbox/vtPlugins/vtCurveDeformer/src/')
+#sys.path.insert(0, '/Users/fruity/Documents/_dev/fToolbox/vtPlugins/vtCurveDeformer/src/')
 import nurbsCurve;reload(nurbsCurve)
 
 pluginName = 'curveDeformer'
@@ -62,21 +62,30 @@ class curveDeformer(omMpx.MPxDeformerNode):
     aCps       = om.MObject()
     aMatrixJoint  = om.MObject()
     aMatrixJoints = om.MObject()
+
+    if om.MGlobal.apiVersion() < 201600:
+        _input = omMpx.cvar.MPxDeformerNode_input # note: input is a python builtin
+        inputGeom = omMpx.cvar.MPxDeformerNode_inputGeom
+        envelope = omMpx.cvar.MPxDeformerNode_envelope
+        outputGeom = omMpx.cvar.MPxDeformerNode_outputGeom
+    else:
+        _input = omMpx.cvar.MPxGeometryFilter_input # note: input is a python builtin
+        inputGeom = omMpx.cvar.MPxGeometryFilter_inputGeom
+        envelope = omMpx.cvar.MPxGeometryFilter_envelope
+        outputGeom = omMpx.cvar.MPxGeometryFilter_outputGeom
+    
     def __init__(self):
         omMpx.MPxDeformerNode.__init__(self)
    
     def deform(self, data, itGeo, localToWorldMatrix, geomIndex):
         # 
         # get input datas
-        input = omMpx.cvar.MPxDeformerNode_input
-        inputGeom = omMpx.cvar.MPxDeformerNode_inputGeom
-        hDeformedMeshArray = data.outputArrayValue(input)
+        hDeformedMeshArray = data.outputArrayValue(curveDeformer._input)
         hDeformedMeshArray.jumpToElement(geomIndex)
         hDeformedMeshElement = hDeformedMeshArray.outputValue()
-        oDeformedMesh = hDeformedMeshElement.child(inputGeom).asMesh()
+        oDeformedMesh = hDeformedMeshElement.child(curveDeformer.inputGeom).asMesh()
         fnDeformedMesh = om.MFnMesh(oDeformedMesh)
         
-
         # ----------------------------------------------------------------------
         #                               GET THE ATTRIBUTES
         # ---------------------------------------------------------------------- 
@@ -101,8 +110,7 @@ class curveDeformer(omMpx.MPxDeformerNode):
         knots = [knots[0]] + knots + [knots[-1]]
 
         # envelope
-        envelope = omMpx.cvar.MPxDeformerNode_envelope
-        envelopeHandle = data.inputValue(envelope)
+        envelopeHandle = data.inputValue(curveDeformer.envelope)
         env = envelopeHandle.asFloat()
         if not env: return
 
@@ -865,12 +873,11 @@ def nodeInitializer():
     curveDeformer.addAttribute(curveDeformer.aMatrixJoints)
 
     # attribute effects
-    outputGeom = omMpx.cvar.MPxDeformerNode_outputGeom
-    curveDeformer.attributeAffects(curveDeformer.aInit, outputGeom)
-    curveDeformer.attributeAffects(curveDeformer.aInCrv, outputGeom)
-    curveDeformer.attributeAffects(curveDeformer.aBaseCrv, outputGeom)
-    curveDeformer.attributeAffects(curveDeformer.aCps, outputGeom)
-    curveDeformer.attributeAffects(curveDeformer.aMatrixJoints, outputGeom)
+    curveDeformer.attributeAffects(curveDeformer.aInit, curveDeformer.outputGeom)
+    curveDeformer.attributeAffects(curveDeformer.aInCrv, curveDeformer.outputGeom)
+    curveDeformer.attributeAffects(curveDeformer.aBaseCrv, curveDeformer.outputGeom)
+    curveDeformer.attributeAffects(curveDeformer.aCps, curveDeformer.outputGeom)
+    curveDeformer.attributeAffects(curveDeformer.aMatrixJoints, curveDeformer.outputGeom)
 
     # make deformer paintable
     om.MGlobal.executeCommand("makePaintable -attrType multiFloat -sm deformer curveDeformer ws;")
