@@ -23,6 +23,7 @@ np.set_printoptions(precision=3)
 cmds.delete(df)
 cmds.flushUndo()
 cmds.unloadPlugin('vtCurveDeformer')
+cmds.file('/Users/fruity/Documents/_dev/curveDeformer/scenes/example_scene_2015.ma', o=1, f=1)
 cmds.loadPlugin('/Users/fruity/Documents/_dev/fToolbox/vtPlugins/vtCurveDeformer/src/vtCurveDeformer.py')
 df = cmds.deformer('pCylinder1', type='curveDeformer')[0]
 cmds.connectAttr('inCrv.worldSpace', df + '.inCrv')
@@ -124,7 +125,6 @@ class curveDeformer(omMpx.MPxDeformerNode):
             jt_mat = om.MTransformationMatrix(hMatrixJointsArray.inputValue().child(curveDeformer.aMatrixJoint).asMatrix())
             vPos = jt_mat.getTranslation(om.MSpace.kWorld)
             self.jts_pos.append([vPos.x, vPos.y, vPos.z])
-
         # get the control points and the weights
         weights = []  # list of floats
         hCvArray = data.inputArrayValue(self.aCps)
@@ -194,7 +194,6 @@ class curveDeformer(omMpx.MPxDeformerNode):
             while not itGeo.isDone():
                 # compute the Tau multiplier
                 P, O, Q = self._closest_jts_idx[itGeo.index()]
-
                 offset_cvs = []
                 weighted_matrices = []
                 # self._np_jts_pos()
@@ -224,15 +223,15 @@ class curveDeformer(omMpx.MPxDeformerNode):
 
                     # stores the final cv position
                     offset_cvs.append([final_pos.x, final_pos.y, final_pos.z])
-                
+
                 # correct
                 do = 99
                 if itGeo.index() == do:
                     tau = self.get_tau(P, O, Q, om.MPoint(itGeo.position()))
                     default_tau = self._default_taus[itGeo.index()]
                     tau = tau - default_tau
-                    print 'tau -->', tau
-                    print 'weight -->', self._dist_CV_weights
+                    # print 'tau -->', tau
+                    # print 'weight -->', self._dist_CV_weights
                     # tau = self._remap(tau, default_tau-.5, default_tau+.5, -1., 1.)
                     # self.draw_point(itGeo.position(), [tau, 0, 0])
 
@@ -249,8 +248,6 @@ class curveDeformer(omMpx.MPxDeformerNode):
 
                 # now we have the new CP positions, compute the curve
                 crv = nurbsCurve.NurbsCurve(points=offset_cvs, knots=knots, degree=degree, weights=weights)
-                if itGeo.index() == do:
-                    self.draw_curve(crv, [200, 0, 0])
                 new_pos = crv.pt_at_param(self._params[itGeo.index()])
 
 
@@ -819,20 +816,21 @@ class curveDeformer(omMpx.MPxDeformerNode):
         view.endGL()
 
     def draw_curve(self, nurbsCurve, color=[randint(0,100)/100. for _ in xrange(3)]):
-        view = OpenMayaUI.M3dView.active3dView()
-        view.beginGL()
-        pts = nurbsCurve.compute_crv()
-        for i in xrange(len(pts)):
-            if i == 0:
-                continue
-            glFT.glColor3f(*color)
-            glFT.glLineWidth(1)
-            glFT.glBegin(OpenMayaRender.MGL_LINES)
-            glFT.glVertex3f(pts[i-1][0], pts[i-1][1], pts[i-1][2])
-            glFT.glVertex3f(pts[i][0], pts[i][1], pts[i][2])
-            glFT.glEnd()
+        raise DeprecationWarning ('No longer useful, since we use VP2.0')
+        # view = OpenMayaUI.M3dView.active3dView()
+        # view.beginGL()
+        # pts = nurbsCurve.compute_crv()
+        # for i in xrange(len(pts)):
+        #     if i == 0:
+        #         continue
+        #     glFT.glColor3f(*color)
+        #     glFT.glLineWidth(1)
+        #     glFT.glBegin(OpenMayaRender.MGL_LINES)
+        #     glFT.glVertex3f(pts[i-1][0], pts[i-1][1], pts[i-1][2])
+        #     glFT.glVertex3f(pts[i][0], pts[i][1], pts[i][2])
+        #     glFT.glEnd()
 
-        view.endGL()
+        # view.endGL()
 
 def nodeCreator():
     return omMpx.asMPxPtr(curveDeformer())
