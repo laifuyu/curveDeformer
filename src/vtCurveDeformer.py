@@ -173,7 +173,7 @@ class curveDeformer(omMpx.MPxDeformerNode):
             # 5 - get the 3 closest joints for each vertex, to compute Tau parameter later. This is a list of the 3 closest joint indices, for each vertex
             self._closest_jts_idx = self.get_3_closest_jts_per_vertex(itGeo, self.jts_pos)
             P, O, Q = self._closest_jts_idx[itGeo.index()]
-            # 6 - assign a weight to each offset cv
+            # 6 - assign a weight to each offset cv, based on inv dist from O
             self._dist_CV_weights = self.inverse_distance_weighting(O, cvs_base_array)
             # 7 - set the direction of the offset CVs method (in deform)
             self._directions_mat  = self.set_offset_direction(itGeo, self._pOffsets, cvs_base_array, self._base_mats_per_cv)
@@ -224,32 +224,29 @@ class curveDeformer(omMpx.MPxDeformerNode):
                     # stores the final cv position
                     offset_cvs.append([final_pos.x, final_pos.y, final_pos.z])
 
-                # correct
-                do = 99
-                if itGeo.index() == do:
-                    tau = self.get_tau(P, O, Q, om.MPoint(itGeo.position()))
-                    default_tau = self._default_taus[itGeo.index()]
-                    tau = tau - default_tau
-                    # print 'tau -->', tau
-                    # print 'weight -->', self._dist_CV_weights
-                    # tau = self._remap(tau, default_tau-.5, default_tau+.5, -1., 1.)
-                    # self.draw_point(itGeo.position(), [tau, 0, 0])
+                # fix with Tau
+                # do = 99
+                # if itGeo.index() == do:
+                tau = self.get_tau(P, O, Q, om.MPoint(itGeo.position()))
+                default_tau = self._default_taus[itGeo.index()]
+                tau = tau - default_tau
+                # print 'tau -->', tau
+                # print 'weight -->', self._dist_CV_weights
+                # tau = self._remap(tau, default_tau-.5, default_tau+.5, -1., 1.)
 
-                    # get the CVs by distance
-                    # weighted_cvs = self._dist_CV_weights[itGeo.index()]
-                    weighted_cvs = self._dist_CV_weights
-                    offset_cvs = self.offset_CVs_by_tau(itGeo.position(), 
-                                                        offset_cvs, 
-                                                        weighted_matrices, 
-                                                        tau, 
-                                                        weighted_cvs,
-                                                        self._directions_mat[itGeo.index()])
-                    [self.draw_point(cv) for cv in offset_cvs]
+                # get the CVs by distance
+                # weighted_cvs = self._dist_CV_weights[itGeo.index()]
+                weighted_cvs = self._dist_CV_weights
+                offset_cvs = self.offset_CVs_by_tau(itGeo.position(), 
+                                                    offset_cvs, 
+                                                    weighted_matrices, 
+                                                    tau, 
+                                                    weighted_cvs,
+                                                    self._directions_mat[itGeo.index()])
 
                 # now we have the new CP positions, compute the curve
                 crv = nurbsCurve.NurbsCurve(points=offset_cvs, knots=knots, degree=degree, weights=weights)
                 new_pos = crv.pt_at_param(self._params[itGeo.index()])
-
 
 
                 out_positions.append(om.MPoint(new_pos[0], new_pos[1], new_pos[2]))
@@ -632,11 +629,8 @@ class curveDeformer(omMpx.MPxDeformerNode):
 
             # offset_vector = om.MPoint(*(bone_aim_vector * cv_weights[i] * cv_direction[i] * tau))
             offset_vector = om.MPoint(*(bone_aim_vector * cv_weights[i] * tau * -1))
-            # offset_vector = om.MPoint(*(bone_aim_vector * cv_direction[i] * tau))
             new_cv = om.MPoint(*offset_cv) + om.MVector(offset_vector)
-            # if i == 4:
-            #     self.draw_vector(vec_cv_to_pos, pos=cv)
-
+            
             out_cvs[i] = [new_cv.x, new_cv.y, new_cv.z]
 
         return out_cvs
@@ -754,66 +748,68 @@ class curveDeformer(omMpx.MPxDeformerNode):
             print [round(mat(i, j), 2) for j in xrange(4)]
 
     def draw_point(self, point, color=[255, 255, 0]):
-        view = OpenMayaUI.M3dView.active3dView()
-        view.beginGL()
-        glFT.glPointSize(5.8)
-        glFT.glBegin(OpenMayaRender.MGL_POINTS)
-        glFT.glColor3f(*color)
-        if isinstance(point, om.MPoint) or isinstance(point, om.MVector):
-            glFT.glVertex3f(point.x, point.y, point.z)
-        else:
-            glFT.glVertex3f(point[0], point[1], point[2])
-        glFT.glEnd()
+        raise DeprecationWarning ('No longer useful, since we use VP2.0')
+        # view = OpenMayaUI.M3dView.active3dView()
+        # view.beginGL()
+        # glFT.glPointSize(5.8)
+        # glFT.glBegin(OpenMayaRender.MGL_POINTS)
+        # glFT.glColor3f(*color)
+        # if isinstance(point, om.MPoint) or isinstance(point, om.MVector):
+        #     glFT.glVertex3f(point.x, point.y, point.z)
+        # else:
+        #     glFT.glVertex3f(point[0], point[1], point[2])
+        # glFT.glEnd()
 
-        offset = .01
-        if isinstance(point, om.MPoint) or isinstance(point, om.MVector):
-            glFT.glBegin(OpenMayaRender.MGL_LINES)
-            glFT.glVertex3f(point.x-offset, point.y, point.z)
-            glFT.glVertex3f(point.x+offset, point.y, point.z)
-            glFT.glEnd()
-            glFT.glBegin(OpenMayaRender.MGL_LINES)
-            glFT.glVertex3f(point.x, point.y-offset, point.z)
-            glFT.glVertex3f(point.x, point.y+offset, point.z)
-            glFT.glEnd()
-            glFT.glBegin(OpenMayaRender.MGL_LINES)
-            glFT.glVertex3f(point.x-offset, point.y, point.z-offset)
-            glFT.glVertex3f(point.x+offset, point.y, point.z+offset)
-            glFT.glEnd()
-        else:
-            glFT.glBegin(OpenMayaRender.MGL_LINES)
-            glFT.glVertex3f(point[0]-offset, point[1], point[2])
-            glFT.glVertex3f(point[0]+offset, point[1], point[2])
-            glFT.glEnd()
-            glFT.glBegin(OpenMayaRender.MGL_LINES)
-            glFT.glVertex3f(point[0], point[1]-offset, point[2])
-            glFT.glVertex3f(point[0], point[1]+offset, point[2])
-            glFT.glEnd()
-            glFT.glBegin(OpenMayaRender.MGL_LINES)
-            glFT.glVertex3f(point[0]-offset, point[1], point[2]-offset)
-            glFT.glVertex3f(point[0]+offset, point[1], point[2]+offset)
-            glFT.glEnd()
-        view.endGL()
+        # offset = .01
+        # if isinstance(point, om.MPoint) or isinstance(point, om.MVector):
+        #     glFT.glBegin(OpenMayaRender.MGL_LINES)
+        #     glFT.glVertex3f(point.x-offset, point.y, point.z)
+        #     glFT.glVertex3f(point.x+offset, point.y, point.z)
+        #     glFT.glEnd()
+        #     glFT.glBegin(OpenMayaRender.MGL_LINES)
+        #     glFT.glVertex3f(point.x, point.y-offset, point.z)
+        #     glFT.glVertex3f(point.x, point.y+offset, point.z)
+        #     glFT.glEnd()
+        #     glFT.glBegin(OpenMayaRender.MGL_LINES)
+        #     glFT.glVertex3f(point.x-offset, point.y, point.z-offset)
+        #     glFT.glVertex3f(point.x+offset, point.y, point.z+offset)
+        #     glFT.glEnd()
+        # else:
+        #     glFT.glBegin(OpenMayaRender.MGL_LINES)
+        #     glFT.glVertex3f(point[0]-offset, point[1], point[2])
+        #     glFT.glVertex3f(point[0]+offset, point[1], point[2])
+        #     glFT.glEnd()
+        #     glFT.glBegin(OpenMayaRender.MGL_LINES)
+        #     glFT.glVertex3f(point[0], point[1]-offset, point[2])
+        #     glFT.glVertex3f(point[0], point[1]+offset, point[2])
+        #     glFT.glEnd()
+        #     glFT.glBegin(OpenMayaRender.MGL_LINES)
+        #     glFT.glVertex3f(point[0]-offset, point[1], point[2]-offset)
+        #     glFT.glVertex3f(point[0]+offset, point[1], point[2]+offset)
+        #     glFT.glEnd()
+        # view.endGL()
 
     def draw_vector(self, v, pos=[0,0,0], color=[255,255,255]):
-        view = OpenMayaUI.M3dView.active3dView()
-        view.beginGL()
-        glFT.glColor3f(*color)
-        glFT.glBegin(OpenMayaRender.MGL_LINES)
-        if isinstance(pos, om.MPoint) or isinstance(pos, om.MVector):
-            start = [pos.x, pos.y, pos.z]
-        else:
-            start = pos
+        raise DeprecationWarning ('No longer useful, since we use VP2.0')
+        # view = OpenMayaUI.M3dView.active3dView()
+        # view.beginGL()
+        # glFT.glColor3f(*color)
+        # glFT.glBegin(OpenMayaRender.MGL_LINES)
+        # if isinstance(pos, om.MPoint) or isinstance(pos, om.MVector):
+        #     start = [pos.x, pos.y, pos.z]
+        # else:
+        #     start = pos
 
-        if isinstance(v, om.MPoint) or isinstance(v, om.MVector):
-            end = [start[0] + v.x, start[0] + v.y, start[0] + v.z]
-        else:
-            end = [start[0] + v[0], start[1] + v[1], start[2] + v[2]]
+        # if isinstance(v, om.MPoint) or isinstance(v, om.MVector):
+        #     end = [start[0] + v.x, start[0] + v.y, start[0] + v.z]
+        # else:
+        #     end = [start[0] + v[0], start[1] + v[1], start[2] + v[2]]
 
-        glFT.glVertex3f(*start)
-        glFT.glVertex3f(*end)
+        # glFT.glVertex3f(*start)
+        # glFT.glVertex3f(*end)
 
-        glFT.glEnd()
-        view.endGL()
+        # glFT.glEnd()
+        # view.endGL()
 
     def draw_curve(self, nurbsCurve, color=[randint(0,100)/100. for _ in xrange(3)]):
         raise DeprecationWarning ('No longer useful, since we use VP2.0')
